@@ -6,14 +6,14 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #faf9f5; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
-    #__bundler_loading { position: fixed; bottom: 20px; right: 20px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; color: #666; background: #fff; padding: 8px 14px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); z-index: 10000; }
+    #__bundler_loading { position: fixed; bottom: 20px; right: 20px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; color: #666; background: #fff; padding: 8px 14px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.08); z-index: 10000; }
     #__bundler_thumbnail { position: fixed; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #faf9f5; z-index: 9999; }
     #__bundler_thumbnail svg { width: 100%; height: 100%; object-fit: contain; }
     #__bundler_placeholder { color: #999; font-size: 14px; }
   </style>
   <noscript>
     <style>#__bundler_loading { display: none; }</style>
-    <div style="position:fixed;bottom:12px;left:12px;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#999;background:rgba(255,255,255,0.9);padding:6px 12px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,0.08);z-index:10000;">
+    <div style="position:fixed;bottom:12px;left:12px;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#999;background:rgba(255,255,255,0.9);padding:6px 12px;border-radius:6px;box-shadow:0 2px 10px rgba(0,0,0,.08);z-index:10001;">
       This page requires JavaScript to display.
     </div>
   </noscript>
@@ -32,35 +32,47 @@
     }, { once: true });
   </script>
   <div id="__bundler_thumbnail">
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-    <rect width="100" height="100" fill="#160a0f"></rect>
-    <path d="M50 72 C 38 62 30 53 30 42 C 30 35 35.5 30 42 30 C 45.5 30 49 32 50 35 C 51 32 54.5 30 58 30 C 64.5 30 70 35 70 42 C 70 53 62 62 50 72 Z" fill="#d44d5c"></path>
-  </svg>
-</div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+      <rect width="100" height="100" fill="#160a0f"></rect>
+      <path d="M50 72 C 38 62 30 53 30 42 C 30 35 35.5 30 42 30 C 45.5 30 49 32 50 35 C 51 32 54.5 30 58 30 C 64.5 30 70 35 70 42 C 70 53 62 62 50 72 Z" fill="#d44d5c"></path>
+    </svg>
+  </div>
   <div id="__bundler_loading">Unpacking...</div>
 
   <script>
-    
  document.addEventListener('DOMContentLoaded', async function() {
   const loading = document.getElementById('__bundler_loading');
   function setStatus(msg) { if (loading) loading.textContent = msg; }
 
-  // Error sink persists across replaceWith since it's on window, not the DOM.
   window.addEventListener('error', function(e) {
     var p = document.body || document.documentElement;
     var d = document.getElementById('__bundler_err') || p.appendChild(document.createElement('div'));
     d.id = '__bundler_err';
-    d.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;font:12px/1.4 ui-monospace,monospace;background:#2a1215;color:#ff8a80;padding:10px 14px;border-radius:8px;border:1px solid #5a2a2f;z-index:10001;white-space:pre-wrap;max-height:40vh;overflow:auto';
+    d.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;font:12px/1.4 ui-monospace,monospace;background:#2a1215;color:#ff8a80;padding:10px 14px;border-radius:8px;border:1px solid #5a2a2a;z-index:10002;white-space:pre-wrap;word-break:break-word';
     d.textContent = (d.textContent ? d.textContent + String.fromCharCode(10) : '') +
       '[bundle] ' + (e.message || e.type) +
       (e.filename ? ' (' + e.filename.slice(0, 60) + ':' + e.lineno + ')' : '');
   }, true);
 
+  function showFallback(message) {
+    setStatus(message);
+    var thumb = document.getElementById('__bundler_thumbnail');
+    if (thumb) {
+      var existing = document.getElementById('__bundler_placeholder');
+      if (!existing) {
+        var fallback = document.createElement('div');
+        fallback.id = '__bundler_placeholder';
+        fallback.textContent = 'Não foi possível carregar este conteúdo agora.';
+        thumb.appendChild(fallback);
+      }
+    }
+  }
+
   try {
     const manifestEl = document.querySelector('script[type="__bundler/manifest"]');
     const templateEl = document.querySelector('script[type="__bundler/template"]');
     if (!manifestEl || !templateEl) {
-      setStatus('Error: missing bundle data');
+      showFallback('Error: missing bundle data');
       console.error('[bundler] Missing script tags — manifestEl:', !!manifestEl, 'templateEl:', !!templateEl);
       return;
     }
@@ -72,6 +84,8 @@
     setStatus('Unpacking ' + uuids.length + ' assets...');
 
     const blobUrls = {};
+    let decodeFailed = false;
+
     await Promise.all(uuids.map(async (uuid) => {
       const entry = manifest[uuid];
       try {
@@ -83,21 +97,9 @@
         if (entry.compressed) {
           if (typeof DecompressionStream !== 'undefined') {
             const ds = new DecompressionStream('gzip');
-            const writer = ds.writable.getWriter();
-            const reader = ds.readable.getReader();
-            writer.write(bytes);
-            writer.close();
-            const chunks = [];
-            let totalLen = 0;
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              chunks.push(value);
-              totalLen += value.length;
-            }
-            finalBytes = new Uint8Array(totalLen);
-            let offset = 0;
-            for (const chunk of chunks) { finalBytes.set(chunk, offset); offset += chunk.length; }
+            const decompressedStream = new Blob([bytes]).stream().pipeThrough(ds);
+            const decompressedBuffer = await new Response(decompressedStream).arrayBuffer();
+            finalBytes = new Uint8Array(decompressedBuffer);
           } else {
             console.warn('DecompressionStream not available, asset ' + uuid + ' may not render');
           }
@@ -105,10 +107,15 @@
 
         blobUrls[uuid] = URL.createObjectURL(new Blob([finalBytes], { type: entry.mime }));
       } catch (err) {
+        decodeFailed = true;
         console.error('Failed to decode asset ' + uuid + ':', err);
-        blobUrls[uuid] = URL.createObjectURL(new Blob([], { type: entry.mime }));
       }
     }));
+
+    if (decodeFailed || uuids.some((uuid) => !blobUrls[uuid])) {
+      showFallback('Erro ao descompactar os arquivos do pacote.');
+      return;
+    }
 
     const extResEl = document.querySelector('script[type="__bundler/ext_resources"]');
     const extResources = extResEl ? JSON.parse(extResEl.textContent) : [];
@@ -151,11 +158,10 @@
       window.Babel.transformScriptTags();
     }
   } catch (err) {
-    setStatus('Error unpacking: ' + err.message);
+    showFallback('Error unpacking: ' + err.message);
     console.error('Bundle unpack error:', err);
   }
 });
-
   </script>
 
   <script type="__bundler/manifest">
